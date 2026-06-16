@@ -498,11 +498,6 @@ __builtin_wasm_table_size
     .attributes = .{ .custom_typecheck = true }
     .features = "reference_types"
 
-__builtin_wasm_test_function_pointer_signature
-    .param_str = "i."
-    .attributes = .{ .@"const" = true, .custom_typecheck = true }
-    .features = "gc"
-
 __builtin_wasm_throw
     .param_str = "vIUiv*"
     .attributes = .{ .@"noreturn" = true }

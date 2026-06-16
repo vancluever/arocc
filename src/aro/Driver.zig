@@ -964,9 +964,8 @@ fn addImacros(d: *Driver, path: []const u8) !void {
 }
 
 pub fn err(d: *Driver, fmt: []const u8, args: anytype) Compilation.Error!void {
-    var bfa_buf: [1024]u8 = undefined;
-    var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, d.comp.gpa);
-    var allocating: std.Io.Writer.Allocating = .init(bfa.allocator());
+    var bfa = std.heap.stackFallback(1024, d.comp.gpa);
+    var allocating: std.Io.Writer.Allocating = .init(bfa.get());
     defer allocating.deinit();
 
     Diagnostics.formatArgs(&allocating.writer, fmt, args) catch return error.OutOfMemory;
@@ -974,9 +973,8 @@ pub fn err(d: *Driver, fmt: []const u8, args: anytype) Compilation.Error!void {
 }
 
 pub fn warn(d: *Driver, fmt: []const u8, args: anytype) Compilation.Error!void {
-    var bfa_buf: [1024]u8 = undefined;
-    var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, d.comp.gpa);
-    var allocating: std.Io.Writer.Allocating = .init(bfa.allocator());
+    var bfa = std.heap.stackFallback(1024, d.comp.gpa);
+    var allocating: std.Io.Writer.Allocating = .init(bfa.get());
     defer allocating.deinit();
 
     Diagnostics.formatArgs(&allocating.writer, fmt, args) catch return error.OutOfMemory;
@@ -1058,7 +1056,7 @@ fn parseTarget(d: *Driver, arch_os_abi: []const u8, opt_cpu_features: ?[]const u
         } else if (mem.eql(u8, cpu_name, "baseline")) {
             query.cpu_model = .baseline;
         } else {
-            query.cpu_model = .{ .explicit = arch.parseCpuModel(cpu_name) orelse
+            query.cpu_model = .{ .explicit = arch.parseCpuModel(cpu_name) catch
                 return d.fatal("unknown CPU model: '{s}'", .{cpu_name}) };
         }
 
@@ -1120,9 +1118,8 @@ fn parseTarget(d: *Driver, arch_os_abi: []const u8, opt_cpu_features: ?[]const u
 }
 
 pub fn fatal(d: *Driver, comptime fmt: []const u8, args: anytype) error{ FatalError, OutOfMemory } {
-    var bfa_buf: [1024]u8 = undefined;
-    var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, d.comp.gpa);
-    var allocating: std.Io.Writer.Allocating = .init(bfa.allocator());
+    var bfa = std.heap.stackFallback(1024, d.comp.gpa);
+    var allocating: std.Io.Writer.Allocating = .init(bfa.get());
     defer allocating.deinit();
 
     Diagnostics.formatArgs(&allocating.writer, fmt, args) catch return error.OutOfMemory;

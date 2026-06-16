@@ -1,25 +1,5 @@
 # Generated from clang/include/clang/Basic/BuiltinsAMDGPU.def
 
-__builtin_amdgcn_add_max_i32
-    .param_str = "iiiiIb"
-    .attributes = .{ .@"const" = true }
-    .features = "add_min_max_insts"
-
-__builtin_amdgcn_add_max_u32
-    .param_str = "UiUiUiUiIb"
-    .attributes = .{ .@"const" = true }
-    .features = "add_min_max_insts"
-
-__builtin_amdgcn_add_min_i32
-    .param_str = "iiiiIb"
-    .attributes = .{ .@"const" = true }
-    .features = "add_min_max_insts"
-
-__builtin_amdgcn_add_min_u32
-    .param_str = "UiUiUiUiIb"
-    .attributes = .{ .@"const" = true }
-    .features = "add_min_max_insts"
-
 __builtin_amdgcn_alignbit
     .param_str = "UiUiUiUi"
     .attributes = .{ .@"const" = true }
@@ -103,41 +83,6 @@ __builtin_amdgcn_cluster_id_z
     .param_str = "Ui"
     .attributes = .{ .@"const" = true }
     .features = "gfx1250_insts"
-
-__builtin_amdgcn_cluster_load_async_to_lds_b128
-    .param_str = "vV4i*1V4i*3IiIii"
-    .attributes = .{ .@"const" = true }
-    .features = "mcast_load_insts,wavefrontsize32"
-
-__builtin_amdgcn_cluster_load_async_to_lds_b32
-    .param_str = "vi*1i*3IiIii"
-    .attributes = .{ .@"const" = true }
-    .features = "mcast_load_insts,wavefrontsize32"
-
-__builtin_amdgcn_cluster_load_async_to_lds_b64
-    .param_str = "vV2i*1V2i*3IiIii"
-    .attributes = .{ .@"const" = true }
-    .features = "mcast_load_insts,wavefrontsize32"
-
-__builtin_amdgcn_cluster_load_async_to_lds_b8
-    .param_str = "vc*1c*3IiIii"
-    .attributes = .{ .@"const" = true }
-    .features = "mcast_load_insts,wavefrontsize32"
-
-__builtin_amdgcn_cluster_load_b128
-    .param_str = "V4iV4i*1Iii"
-    .attributes = .{ .@"const" = true }
-    .features = "mcast_load_insts,wavefrontsize32"
-
-__builtin_amdgcn_cluster_load_b32
-    .param_str = "ii*1Iii"
-    .attributes = .{ .@"const" = true }
-    .features = "mcast_load_insts,wavefrontsize32"
-
-__builtin_amdgcn_cluster_load_b64
-    .param_str = "V2iV2i*1Iii"
-    .attributes = .{ .@"const" = true }
-    .features = "mcast_load_insts,wavefrontsize32"
 
 __builtin_amdgcn_cluster_workgroup_flat_id
     .param_str = "Ui"
@@ -226,22 +171,18 @@ __builtin_amdgcn_cosh
 __builtin_amdgcn_cubeid
     .param_str = "ffff"
     .attributes = .{ .@"const" = true }
-    .features = "cube_insts"
 
 __builtin_amdgcn_cubema
     .param_str = "ffff"
     .attributes = .{ .@"const" = true }
-    .features = "cube_insts"
 
 __builtin_amdgcn_cubesc
     .param_str = "ffff"
     .attributes = .{ .@"const" = true }
-    .features = "cube_insts"
 
 __builtin_amdgcn_cubetc
     .param_str = "ffff"
     .attributes = .{ .@"const" = true }
-    .features = "cube_insts"
 
 __builtin_amdgcn_cvt_f16_bf8
     .param_str = "hiIi"
@@ -332,12 +273,10 @@ __builtin_amdgcn_cvt_pk_u8_f32
 __builtin_amdgcn_cvt_pknorm_i16
     .param_str = "E2sff"
     .attributes = .{ .@"const" = true }
-    .features = "cvt_pknorm_vop2_insts"
 
 __builtin_amdgcn_cvt_pknorm_u16
     .param_str = "E2Usff"
     .attributes = .{ .@"const" = true }
-    .features = "cvt_pknorm_vop2_insts"
 
 __builtin_amdgcn_cvt_pkrtz
     .param_str = "E2hff"
@@ -1159,11 +1098,6 @@ __builtin_amdgcn_flat_load_monitor_b64
     .attributes = .{ .@"const" = true }
     .features = "gfx1250_insts"
 
-__builtin_amdgcn_flat_prefetch
-    .param_str = "vvC*0Ii"
-    .attributes = .{ .@"const" = true }
-    .features = "vmem_pref_insts"
-
 __builtin_amdgcn_fmed3f
     .param_str = "ffff"
     .attributes = .{ .@"const" = true }
@@ -1349,11 +1283,6 @@ __builtin_amdgcn_global_load_tr_b64_v2i32
     .param_str = "V2iV2i*1"
     .attributes = .{ .@"const" = true }
     .features = "gfx12_insts,wavefrontsize32"
-
-__builtin_amdgcn_global_prefetch
-    .param_str = "vvC*1Ii"
-    .attributes = .{ .@"const" = true }
-    .features = "vmem_pref_insts"
 
 __builtin_amdgcn_global_store_async_from_lds_b128
     .param_str = "vV4i*1V4i*3IiIi"
@@ -2040,7 +1969,6 @@ __builtin_amdgcn_ldexph
 __builtin_amdgcn_lerp
     .param_str = "UiUiUiUi"
     .attributes = .{ .@"const" = true }
-    .features = "lerp_inst"
 
 __builtin_amdgcn_load_to_lds
     .param_str = "vv*v*3IUiIiIUi"
@@ -2333,21 +2261,6 @@ __builtin_amdgcn_perm
     .attributes = .{ .@"const" = true }
     .features = "gfx8_insts"
 
-__builtin_amdgcn_perm_pk16_b4_u4
-    .param_str = "V2UiUiUiV2Ui"
-    .attributes = .{ .@"const" = true }
-    .features = "tensor_cvt_lut_insts"
-
-__builtin_amdgcn_perm_pk16_b6_u4
-    .param_str = "V3UiUiULiV2Ui"
-    .attributes = .{ .@"const" = true }
-    .features = "tensor_cvt_lut_insts"
-
-__builtin_amdgcn_perm_pk16_b8_u4
-    .param_str = "V4UiULiULiV2Ui"
-    .attributes = .{ .@"const" = true }
-    .features = "tensor_cvt_lut_insts"
-
 __builtin_amdgcn_permlane16
     .param_str = "UiUiUiUiUiIbIb"
     .attributes = .{ .@"const" = true }
@@ -2408,35 +2321,10 @@ __builtin_amdgcn_permlanex16_var
     .attributes = .{ .@"const" = true }
     .features = "gfx12_insts"
 
-__builtin_amdgcn_pk_add_max_i16
-    .param_str = "V2sV2sV2sV2sIb"
-    .attributes = .{ .@"const" = true }
-    .features = "pk_add_min_max_insts"
-
-__builtin_amdgcn_pk_add_max_u16
-    .param_str = "V2UsV2UsV2UsV2UsIb"
-    .attributes = .{ .@"const" = true }
-    .features = "pk_add_min_max_insts"
-
-__builtin_amdgcn_pk_add_min_i16
-    .param_str = "V2sV2sV2sV2sIb"
-    .attributes = .{ .@"const" = true }
-    .features = "pk_add_min_max_insts"
-
-__builtin_amdgcn_pk_add_min_u16
-    .param_str = "V2UsV2UsV2UsV2UsIb"
-    .attributes = .{ .@"const" = true }
-    .features = "pk_add_min_max_insts"
-
 __builtin_amdgcn_prng_b32
     .param_str = "UiUi"
     .attributes = .{ .@"const" = true }
     .features = "prng_inst"
-
-__builtin_amdgcn_qsad_pk_u16_u8
-    .param_str = "WUiWUiUiWUi"
-    .attributes = .{ .@"const" = true }
-    .features = "qsad_insts"
 
 __builtin_amdgcn_queue_ptr
     .param_str = "v*4"
@@ -2714,24 +2602,17 @@ __builtin_amdgcn_s_wait_tensorcnt
 __builtin_amdgcn_s_waitcnt
     .param_str = "vIi"
 
-__builtin_amdgcn_s_wakeup_barrier
-    .param_str = "vv*"
-    .features = "s_wakeup_barrier_inst"
-
 __builtin_amdgcn_sad_hi_u8
     .param_str = "UiUiUiUi"
     .attributes = .{ .@"const" = true }
-    .features = "sad_insts"
 
 __builtin_amdgcn_sad_u16
     .param_str = "UiUiUiUi"
     .attributes = .{ .@"const" = true }
-    .features = "sad_insts"
 
 __builtin_amdgcn_sad_u8
     .param_str = "UiUiUiUi"
     .attributes = .{ .@"const" = true }
-    .features = "sad_insts"
 
 __builtin_amdgcn_sat_pk4_i4_i8
     .param_str = "UsUi"
@@ -3149,16 +3030,6 @@ __builtin_amdgcn_tanh_bf16
     .param_str = "yy"
     .attributes = .{ .@"const" = true }
     .features = "bf16_trans_insts"
-
-__builtin_amdgcn_tanhf
-    .param_str = "ff"
-    .attributes = .{ .@"const" = true }
-    .features = "tanh_insts"
-
-__builtin_amdgcn_tanhh
-    .param_str = "hh"
-    .attributes = .{ .@"const" = true }
-    .features = "tanh_insts"
 
 __builtin_amdgcn_tensor_load_to_lds
     .param_str = "vV4iV8iV4iV4iIi"

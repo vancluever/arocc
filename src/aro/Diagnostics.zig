@@ -337,8 +337,8 @@ pub fn deinit(d: *Diagnostics) void {
 /// Used by the __has_warning builtin macro.
 pub fn warningExists(name: []const u8) bool {
     if (std.mem.eql(u8, name, "pedantic")) return true;
-    inline for (@typeInfo(Option).@"enum".decl_names) |group_name| {
-        if (std.mem.eql(u8, name, group_name)) return true;
+    inline for (@typeInfo(Option).@"enum".decls) |decl| {
+        if (std.mem.eql(u8, name, decl.name)) return true;
     }
     return std.meta.stringToEnum(Option, name) != null;
 }
@@ -353,9 +353,9 @@ pub fn set(d: *Diagnostics, name: []const u8, to: Message.Kind) Compilation.Erro
         return;
     }
 
-    inline for (@typeInfo(Option).@"enum".decl_names) |group_name| {
-        if (std.mem.eql(u8, name, group_name)) {
-            for (@field(Option, group_name)) |option| {
+    inline for (comptime std.meta.declarations(Option)) |group| {
+        if (std.mem.eql(u8, name, group.name)) {
+            for (@field(Option, group.name)) |option| {
                 d.state.options.put(option, to);
             }
             return;

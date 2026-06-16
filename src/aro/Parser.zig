@@ -231,9 +231,8 @@ fn checkIdentifierCodepointWarnings(p: *Parser, codepoint: u21, loc: Source.Loca
     assert(codepoint >= 0x80);
 
     const prev_total = p.diagnostics.total;
-    var bfa_buf: [1024]u8 = undefined;
-    var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, p.comp.gpa);
-    var allocating: std.Io.Writer.Allocating = .init(bfa.allocator());
+    var bfa = std.heap.stackFallback(1024, p.comp.gpa);
+    var allocating: std.Io.Writer.Allocating = .init(bfa.get());
     defer allocating.deinit();
 
     if (!char_info.isC99IdChar(codepoint)) {
@@ -444,9 +443,8 @@ pub fn err(p: *Parser, tok_i: TokenIndex, diagnostic: Diagnostic, args: anytype)
     if (diagnostic.suppress_unless_version) |some| if (!p.comp.langopts.standard.atLeast(some)) return;
     if (p.diagnostics.effectiveKind(diagnostic) == .off) return;
 
-    var bfa_buf: [1024]u8 = undefined;
-    var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, p.comp.gpa);
-    var allocating: std.Io.Writer.Allocating = .init(bfa.allocator());
+    var bfa = std.heap.stackFallback(1024, p.comp.gpa);
+    var allocating: std.Io.Writer.Allocating = .init(bfa.get());
     defer allocating.deinit();
 
     p.formatArgs(&allocating.writer, diagnostic.fmt, args) catch return error.OutOfMemory;
@@ -660,9 +658,8 @@ fn codegenDiagnostic(p: *Parser, usage_tok: TokenIndex, diagnostic: Diagnostic, 
     assert(diagnostic.suppress_version == null);
     if (p.diagnostics.effectiveKind(diagnostic) == .off) return;
 
-    var bfa_buf: [1024]u8 align(4) = undefined;
-    var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, p.comp.gpa);
-    var allocating: std.Io.Writer.Allocating = .initAligned(bfa.allocator(), .of(u32));
+    var bfa = std.heap.stackFallback(1024, p.comp.gpa);
+    var allocating: std.Io.Writer.Allocating = .initAligned(bfa.get(), .of(u32));
     defer allocating.deinit();
 
     p.formatArgs(&allocating.writer, diagnostic.fmt, args) catch return error.OutOfMemory;
@@ -1634,9 +1631,8 @@ fn staticAssert(p: *Parser) Error!bool {
         }
     } else {
         if (!res.val.toBool(p.comp)) {
-            var bfa_buf: [1024]u8 = undefined;
-            var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, gpa);
-            var allocating: std.Io.Writer.Allocating = .init(bfa.allocator());
+            var bfa = std.heap.stackFallback(1024, gpa);
+            var allocating: std.Io.Writer.Allocating = .init(bfa.get());
             defer allocating.deinit();
 
             if (p.staticAssertMessage(res_node, str, &allocating) catch return error.OutOfMemory) |message| {
@@ -5025,9 +5021,8 @@ fn gnuAsmStmt(p: *Parser, quals: Tree.GNUAssemblyQualifiers, asm_tok: TokenIndex
     const expected_items = 8; // arbitrarily chosen, most assembly will have fewer than 8 inputs/outputs/constraints/names
     const bytes_needed = expected_items * @sizeOf(Tree.Node.AsmStmt.Operand) + expected_items * 2 * @sizeOf(Node.Index);
 
-    var bfa_buf: [bytes_needed]u8 = undefined;
-    var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, gpa);
-    const allocator = bfa.allocator();
+    var bfa = std.heap.stackFallback(bytes_needed, gpa);
+    const allocator = bfa.get();
 
     var operands: std.ArrayList(Tree.Node.AsmStmt.Operand) = .empty;
     defer operands.deinit(allocator);
@@ -10224,9 +10219,8 @@ fn primaryExpr(p: *Parser) Error!?Result {
             if (p.func.pretty_ident) |some| {
                 qt = some.qt;
             } else if (p.func.qt) |func_qt| {
-                var bfa_buf: [1024]u8 = undefined;
-                var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, gpa);
-                var allocating: std.Io.Writer.Allocating = .init(bfa.allocator());
+                var bfa = std.heap.stackFallback(1024, p.comp.gpa);
+                var allocating: std.Io.Writer.Allocating = .init(bfa.get());
                 defer allocating.deinit();
 
                 func_qt.printNamed(p.tokSlice(p.func.name), p.comp, &allocating.writer) catch return error.OutOfMemory;
@@ -10515,9 +10509,8 @@ fn charLiteral(p: *Parser) Error!?Result {
         };
 
         const max_chars_expected = 4;
-        var bfa_buf: [max_chars_expected]u32 = undefined;
-        var bfa: std.heap.BufferFirstAllocator = .init(@ptrCast(&bfa_buf), gpa);
-        const allocator = bfa.allocator();
+        var bfa = std.heap.stackFallback(max_chars_expected, gpa);
+        const allocator = bfa.get();
         var chars: std.ArrayList(u32) = .empty;
         defer chars.deinit(allocator);
 

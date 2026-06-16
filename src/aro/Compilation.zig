@@ -78,12 +78,12 @@ pub const Environment = struct {
     pub fn loadAll(environ_map: *const std.process.Environ.Map) Environment {
         var env: Environment = .{};
 
-        inline for (@typeInfo(@TypeOf(env)).@"struct".field_names) |field_name| {
-            std.debug.assert(@field(env, field_name) == null);
+        inline for (@typeInfo(@TypeOf(env)).@"struct".fields) |field| {
+            std.debug.assert(@field(env, field.name) == null);
 
-            var env_var_buf: [field_name.len]u8 = undefined;
-            const env_var_name = std.ascii.upperString(&env_var_buf, field_name);
-            @field(env, field_name) = environ_map.get(env_var_name);
+            var env_var_buf: [field.name.len]u8 = undefined;
+            const env_var_name = std.ascii.upperString(&env_var_buf, field.name);
+            @field(env, field.name) = environ_map.get(env_var_name);
         }
         return env;
     }
@@ -2001,9 +2001,8 @@ fn addToSearchPath(comp: *Compilation, include: Include, verbose: bool) !void {
     try comp.search_path.append(comp.gpa, include);
 }
 fn removeDuplicateSearchPaths(comp: *Compilation, start: usize, verbose: bool) !void {
-    var bfa_buf: [1024]u8 = undefined;
-    var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, comp.gpa);
-    const allocator = bfa.allocator();
+    var bfa = std.heap.stackFallback(1024, comp.gpa);
+    const allocator = bfa.get();
     var seen_includes: std.StringHashMapUnmanaged(void) = .empty;
     defer seen_includes.deinit(allocator);
     var seen_frameworks: std.StringHashMapUnmanaged(void) = .empty;
@@ -2187,9 +2186,8 @@ const FindInclude = struct {
         // For an include like 'Foo/Bar.h', search in '<framework_dir>/Foo.framework/Headers/Bar.h'.
         const framework_name, const header_sub_path = mem.cutScalar(u8, find.include_path, '/') orelse return null;
 
-        var bfa_buf: [path_buf_stack_limit]u8 = undefined;
-        var bfa_state: std.heap.BufferFirstAllocator = .init(&bfa_buf, find.comp.gpa);
-        const bfa = bfa_state.allocator();
+        var bfa_state = std.heap.stackFallback(path_buf_stack_limit, find.comp.gpa);
+        const bfa = bfa_state.get();
         const framework_lookup = try std.fmt.allocPrint(bfa, "{s}.framework", .{framework_name});
         defer bfa.free(framework_lookup);
 
@@ -2211,9 +2209,8 @@ const FindInclude = struct {
         // For an include like 'Foo/Bar.h', search in '<umbrella_framework_path>/Frameworks/Foo.framework/Headers/Bar.h'.
         const framework_name, const header_sub_path = mem.cutScalar(u8, find.include_path, '/') orelse return null;
 
-        var bfa_buf: [path_buf_stack_limit]u8 = undefined;
-        var bfa_state: std.heap.BufferFirstAllocator = .init(&bfa_buf, find.comp.gpa);
-        const bfa = bfa_state.allocator();
+        var bfa_state = std.heap.stackFallback(path_buf_stack_limit, find.comp.gpa);
+        const bfa = bfa_state.get();
         const framework_lookup = try std.fmt.allocPrint(bfa, "{s}.framework", .{framework_name});
         defer bfa.free(framework_lookup);
 
@@ -2242,9 +2239,8 @@ const FindInclude = struct {
     ) Allocator.Error!?Result {
         const comp = find.comp;
 
-        var bfa_buf: [path_buf_stack_limit]u8 = undefined;
-        var bfa_state: std.heap.BufferFirstAllocator = .init(&bfa_buf, comp.gpa);
-        const bfa = bfa_state.allocator();
+        var bfa_state = std.heap.stackFallback(path_buf_stack_limit, comp.gpa);
+        const bfa = bfa_state.get();
         const header_path = try std.fs.path.resolve(bfa, paths);
         defer bfa.free(header_path);
         find.comp.normalizePath(header_path);
@@ -2340,9 +2336,8 @@ pub fn findEmbed(
         }
     }
 
-    var bfa_buf: [path_buf_stack_limit]u8 = undefined;
-    var bfa_state: std.heap.BufferFirstAllocator = .init(&bfa_buf, comp.gpa);
-    const bfa = bfa_state.allocator();
+    var bfa_state = std.heap.stackFallback(path_buf_stack_limit, comp.gpa);
+    const bfa = bfa_state.get();
 
     switch (include_type) {
         .quotes, .cli => {
@@ -2397,9 +2392,8 @@ pub fn findInclude(
     }) orelse return null;
     if (found.used_ms_search_rule) {
         const diagnostic: Diagnostic = .ms_search_rule;
-        var buf: [1024]u8 = undefined;
-        var bfa: std.heap.BufferFirstAllocator = .init(&buf, comp.gpa);
-        var allocating: std.Io.Writer.Allocating = .init(bfa.allocator());
+        var bfa = std.heap.stackFallback(1024, comp.gpa);
+        var allocating: std.Io.Writer.Allocating = .init(bfa.get());
         defer allocating.deinit();
 
         Diagnostics.formatArgs(&allocating.writer, diagnostic.fmt, .{filename}) catch return error.OutOfMemory;

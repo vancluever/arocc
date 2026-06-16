@@ -44,9 +44,8 @@ fn preprocessorHandler(_: *Pragma, pp: *Preprocessor, start_idx: TokenIndex) Pra
 
     const diagnostic: Pragma.Diagnostic = .pragma_message;
 
-    var bfa_buf: [1024]u8 = undefined;
-    var bfa: std.heap.BufferFirstAllocator = .init(&bfa_buf, pp.comp.gpa);
-    var allocating: std.Io.Writer.Allocating = .init(bfa.allocator());
+    var bfa = std.heap.stackFallback(1024, pp.comp.gpa);
+    var allocating: std.Io.Writer.Allocating = .init(bfa.get());
     defer allocating.deinit();
 
     Diagnostics.formatArgs(&allocating.writer, diagnostic.fmt, .{str}) catch return error.OutOfMemory;
