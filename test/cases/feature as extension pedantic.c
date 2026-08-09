@@ -2,7 +2,7 @@
 // return unsupported on C99).
 
 #if __has_extension(c_alignas)
-#error expected c_alignas to be unavailble as an extension
+#error expected c_alignas to be unavailable as an extension
 #endif
 
 int main(void) {

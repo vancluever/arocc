@@ -177,7 +177,6 @@ pub const Option = enum {
     @"invalid-pp-token",
     @"deprecated-non-prototype",
     @"duplicate-embed-param",
-    @"unsupported-embed-param",
     @"unused-result",
     normalized,
     @"shift-count-negative",
@@ -208,6 +207,12 @@ pub const Option = enum {
     @"unsupported-visibility",
     @"deprecated-attributes",
     section,
+    @"label-attribute",
+    @"unused-variable",
+    @"unused-parameter",
+    @"unused-local-typedef",
+    @"unused-label",
+    @"unused-comparison",
 
     /// GNU extensions
     pub const gnu = [_]Option{
@@ -262,6 +267,11 @@ pub const Option = enum {
     pub const unused = [_]Option{
         .@"unused-value",
         .@"unused-result",
+        .@"unused-variable",
+        // .@"unused-parameter", // Matches gcc and clang
+        .@"unused-local-typedef",
+        .@"unused-label",
+        .@"unused-comparison",
     };
 
     pub const most = implicit ++ unused ++ [_]Option{
@@ -339,15 +349,15 @@ pub fn deinit(d: *Diagnostics) void {
 
 /// Used by the __has_warning builtin macro.
 pub fn warningExists(name: []const u8) bool {
-    if (std.mem.eql(u8, name, "pedantic")) return true;
+    if (mem.eql(u8, name, "pedantic")) return true;
     inline for (@typeInfo(Option).@"enum".decls) |decl| {
-        if (std.mem.eql(u8, name, decl.name)) return true;
+        if (mem.eql(u8, name, decl.name)) return true;
     }
     return std.meta.stringToEnum(Option, name) != null;
 }
 
 pub fn set(d: *Diagnostics, name: []const u8, to: Message.Kind) Compilation.Error!void {
-    if (std.mem.eql(u8, name, "pedantic")) {
+    if (mem.eql(u8, name, "pedantic")) {
         d.state.extensions = to;
         return;
     }
@@ -357,7 +367,7 @@ pub fn set(d: *Diagnostics, name: []const u8, to: Message.Kind) Compilation.Erro
     }
 
     inline for (comptime std.meta.declarations(Option)) |group| {
-        if (std.mem.eql(u8, name, group.name)) {
+        if (mem.eql(u8, name, group.name)) {
             for (@field(Option, group.name)) |option| {
                 d.state.options.put(option, to);
             }
@@ -374,6 +384,10 @@ pub fn set(d: *Diagnostics, name: []const u8, to: Message.Kind) Compilation.Erro
         .opt = .@"unknown-warning-option",
         .location = null,
     });
+}
+
+pub fn severity(d: *Diagnostics, option: Option) Message.Kind {
+    return d.state.options.get(option) orelse .off;
 }
 
 /// This mutates the `Diagnostics`, so may only be called when `message` is being added.
@@ -506,8 +520,9 @@ pub fn formatArgs(w: *std.Io.Writer, fmt: []const u8, args: anytype) std.Io.Writ
         i += switch (@TypeOf(arg)) {
             []const u8 => try formatString(w, fmt[i..], arg),
             else => switch (@typeInfo(@TypeOf(arg))) {
-                .int, .comptime_int => try Diagnostics.formatInt(w, fmt[i..], arg),
-                .pointer => try Diagnostics.formatString(w, fmt[i..], arg),
+                .int, .comptime_int => try formatInt(w, fmt[i..], arg),
+                .pointer => try formatString(w, fmt[i..], arg),
+                .@"struct" => try arg.format(w, fmt[i..]),
                 else => comptime unreachable,
             },
         };
@@ -516,7 +531,7 @@ pub fn formatArgs(w: *std.Io.Writer, fmt: []const u8, args: anytype) std.Io.Writ
 }
 
 pub fn templateIndex(w: *std.Io.Writer, fmt: []const u8, template: []const u8) std.Io.Writer.Error!usize {
-    const i = std.mem.indexOf(u8, fmt, template) orelse {
+    const i = mem.find(u8, fmt, template) orelse {
         if (@import("builtin").mode == .Debug) {
             std.debug.panic("template `{s}` not found in format string `{s}`", .{ template, fmt });
         }

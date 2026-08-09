@@ -6,7 +6,6 @@ const Attribute = @import("Attribute.zig");
 const CodeGen = @import("CodeGen.zig");
 const Compilation = @import("Compilation.zig");
 const Diagnostics = @import("Diagnostics.zig");
-const number_affixes = @import("Tree/number_affixes.zig");
 const Source = @import("Source.zig");
 const Tokenizer = @import("Tokenizer.zig");
 const QualType = @import("TypeStore.zig").QualType;
@@ -18,8 +17,73 @@ pub const Token = struct {
 
     pub const List = std.MultiArrayList(Token);
     pub const Id = Tokenizer.Token.Id;
-    pub const NumberPrefix = number_affixes.Prefix;
-    pub const NumberSuffix = number_affixes.Suffix;
+
+    pub const Precedence = enum(i8) {
+        comma = 1,
+        assign,
+        binary_conditional,
+        conditional,
+        bool_or,
+        bool_and,
+        bit_or,
+        bit_xor,
+        bit_and,
+        equality,
+        comparison,
+        shift,
+        additive,
+        multiplicative,
+        _,
+
+        pub const any: Precedence = @enumFromInt(0);
+        pub const invalid: Precedence = @enumFromInt(-1);
+
+        pub fn next(p: Precedence, min: Precedence) Precedence {
+            return switch (p) {
+                .assign => .assign, // Right associative.
+                .conditional => min, // Right associative.
+                else => @enumFromInt(@intFromEnum(p) + 1),
+            };
+        }
+
+        pub fn lt(a: Precedence, b: Precedence) bool {
+            return std.math.compare(@intFromEnum(a), .lt, @intFromEnum(b));
+        }
+    };
+
+    pub const precedence = std.enums.directEnumArrayDefault(Tree.Token.Id, Precedence, .invalid, 0, .{
+        .comma = .comma,
+        .equal = .assign,
+        .asterisk_equal = .assign,
+        .slash_equal = .assign,
+        .percent_equal = .assign,
+        .plus_equal = .assign,
+        .minus_equal = .assign,
+        .angle_bracket_angle_bracket_left_equal = .assign,
+        .angle_bracket_angle_bracket_right_equal = .assign,
+        .ampersand_equal = .assign,
+        .caret_equal = .assign,
+        .pipe_equal = .assign,
+        .question_mark = .conditional,
+        .pipe_pipe = .bool_or,
+        .ampersand_ampersand = .bool_and,
+        .pipe = .bit_or,
+        .caret = .bit_xor,
+        .ampersand = .bit_and,
+        .equal_equal = .equality,
+        .bang_equal = .equality,
+        .angle_bracket_right = .comparison,
+        .angle_bracket_right_equal = .comparison,
+        .angle_bracket_left = .comparison,
+        .angle_bracket_left_equal = .comparison,
+        .angle_bracket_angle_bracket_right = .shift,
+        .angle_bracket_angle_bracket_left = .shift,
+        .plus = .additive,
+        .minus = .additive,
+        .asterisk = .multiplicative,
+        .slash = .multiplicative,
+        .percent = .multiplicative,
+    });
 };
 
 pub const TokenWithExpansionLocs = struct {
@@ -194,6 +258,7 @@ pub const Node = union(enum) {
     null_stmt: NullStmt,
     return_stmt: ReturnStmt,
     asm_stmt: AsmStmt,
+    decl_stmt: DeclStmt,
 
     assign_expr: Binary,
     mul_assign_expr: Binary,
@@ -441,10 +506,7 @@ pub const Node = union(enum) {
 
     pub const ForStmt = struct {
         for_tok: TokenIndex,
-        init: union(enum) {
-            decls: []const Node.Index,
-            expr: ?Node.Index,
-        },
+        init: ?Node.Index,
         cond: ?Node.Index,
         incr: ?Node.Index,
         body: Node.Index,
@@ -496,6 +558,11 @@ pub const Node = union(enum) {
             constraint: Node.Index,
             expr: Node.Index,
         };
+    };
+
+    pub const DeclStmt = struct {
+        decls: []const Node.Index,
+        first_tok: TokenIndex,
     };
 
     pub const Binary = struct {
@@ -1019,21 +1086,75 @@ pub const Node = union(enum) {
                         .body = @enumFromInt(node_data[1]),
                     },
                 },
-                .for_decl => .{
+                .for_full => .{
                     .for_stmt = .{
                         .for_tok = node_tok,
-                        .init = .{ .decls = @ptrCast(tree.extra.items[node_data[0]..][0 .. node_data[1] - 2]) },
-                        .cond = unpackOptIndex(tree.extra.items[node_data[0] + node_data[1] - 2]),
-                        .incr = unpackOptIndex(tree.extra.items[node_data[0] + node_data[1] - 1]),
+                        .init = unpackOptIndex(node_data[0]),
+                        .cond = unpackOptIndex(tree.extra.items[node_data[1]]),
+                        .incr = unpackOptIndex(tree.extra.items[node_data[1] + 1]),
                         .body = @enumFromInt(node_data[2]),
                     },
                 },
-                .for_expr => .{
+                .for_init_cond => .{
                     .for_stmt = .{
                         .for_tok = node_tok,
-                        .init = .{ .expr = unpackOptIndex(node_data[0]) },
-                        .cond = unpackOptIndex(tree.extra.items[node_data[1]]),
-                        .incr = unpackOptIndex(tree.extra.items[node_data[1] + 1]),
+                        .init = unpackOptIndex(node_data[0]),
+                        .cond = unpackOptIndex(node_data[1]),
+                        .incr = null,
+                        .body = @enumFromInt(node_data[2]),
+                    },
+                },
+                .for_init_incr => .{
+                    .for_stmt = .{
+                        .for_tok = node_tok,
+                        .init = unpackOptIndex(node_data[0]),
+                        .cond = null,
+                        .incr = unpackOptIndex(node_data[1]),
+                        .body = @enumFromInt(node_data[2]),
+                    },
+                },
+                .for_cond_incr => .{
+                    .for_stmt = .{
+                        .for_tok = node_tok,
+                        .init = null,
+                        .cond = unpackOptIndex(node_data[0]),
+                        .incr = unpackOptIndex(node_data[1]),
+                        .body = @enumFromInt(node_data[2]),
+                    },
+                },
+                .for_init => .{
+                    .for_stmt = .{
+                        .for_tok = node_tok,
+                        .init = unpackOptIndex(node_data[0]),
+                        .cond = null,
+                        .incr = null,
+                        .body = @enumFromInt(node_data[2]),
+                    },
+                },
+                .for_cond => .{
+                    .for_stmt = .{
+                        .for_tok = node_tok,
+                        .init = null,
+                        .cond = unpackOptIndex(node_data[0]),
+                        .incr = null,
+                        .body = @enumFromInt(node_data[2]),
+                    },
+                },
+                .for_incr => .{
+                    .for_stmt = .{
+                        .for_tok = node_tok,
+                        .init = null,
+                        .cond = null,
+                        .incr = unpackOptIndex(node_data[0]),
+                        .body = @enumFromInt(node_data[2]),
+                    },
+                },
+                .for_ever => .{
+                    .for_stmt = .{
+                        .for_tok = node_tok,
+                        .init = null,
+                        .cond = null,
+                        .incr = null,
                         .body = @enumFromInt(node_data[2]),
                     },
                 },
@@ -1138,6 +1259,18 @@ pub const Node = union(enum) {
                         .clobbers = &.{},
                         .labels = &.{},
                         .quals = @bitCast(node_data[1]),
+                    },
+                },
+                .decl_stmt => .{
+                    .decl_stmt = .{
+                        .first_tok = node_tok,
+                        .decls = @ptrCast(tree.extra.items[node_data[0]..][0..node_data[1]]),
+                    },
+                },
+                .decl_stmt_three => .{
+                    .decl_stmt = .{
+                        .first_tok = node_tok,
+                        .decls = unPackElems(node_data),
                     },
                 },
                 .assign_expr => .{
@@ -1865,8 +1998,14 @@ pub const Node = union(enum) {
                 .default_stmt,
                 .while_stmt,
                 .do_while_stmt,
-                .for_decl,
-                .for_expr,
+                .for_full,
+                .for_init_cond,
+                .for_init_incr,
+                .for_cond_incr,
+                .for_init,
+                .for_cond,
+                .for_incr,
+                .for_ever,
                 .goto_stmt,
                 .computed_goto_stmt,
                 .continue_stmt,
@@ -1876,6 +2015,8 @@ pub const Node = union(enum) {
                 .asm_stmt_inline,
                 .asm_stmt_inline_volatile,
                 .asm_stmt_simple,
+                .decl_stmt_three,
+                .decl_stmt,
                 .null_stmt,
                 .labeled_stmt,
                 .global_asm,
@@ -1974,8 +2115,14 @@ pub const Node = union(enum) {
             default_stmt,
             while_stmt,
             do_while_stmt,
-            for_expr,
-            for_decl,
+            for_full,
+            for_init_cond,
+            for_init_incr,
+            for_cond_incr,
+            for_init,
+            for_cond,
+            for_incr,
+            for_ever,
             goto_stmt,
             computed_goto_stmt,
             continue_stmt,
@@ -1989,6 +2136,8 @@ pub const Node = union(enum) {
             asm_stmt_volatile,
             asm_stmt_inline_volatile,
             asm_stmt_simple,
+            decl_stmt_three,
+            decl_stmt,
             comma_expr,
             assign_expr,
             mul_assign_expr,
@@ -2291,25 +2440,39 @@ pub fn setNode(tree: *Tree, node: Node, index: usize) !void {
             repr.tok = do_while.do_tok;
         },
         .for_stmt => |@"for"| {
-            switch (@"for".init) {
-                .decls => |decls| {
-                    repr.tag = .for_decl;
-                    repr.data[0] = @intCast(tree.extra.items.len);
-                    const len: u32 = @intCast(decls.len + 2);
-                    try tree.extra.ensureUnusedCapacity(tree.comp.gpa, len);
-                    repr.data[1] = len;
-                    tree.extra.appendSliceAssumeCapacity(@ptrCast(decls));
-                    tree.extra.appendAssumeCapacity(packOptIndex(@"for".cond));
-                    tree.extra.appendAssumeCapacity(packOptIndex(@"for".incr));
-                },
-                .expr => |expr| {
-                    repr.tag = .for_expr;
-                    repr.data[0] = packOptIndex(expr);
-                    repr.data[1] = @intCast(tree.extra.items.len);
-                    try tree.extra.ensureUnusedCapacity(tree.comp.gpa, 2);
-                    tree.extra.appendAssumeCapacity(packOptIndex(@"for".cond));
-                    tree.extra.appendAssumeCapacity(packOptIndex(@"for".incr));
-                },
+            const init = @"for".init != null;
+            const cond = @"for".cond != null;
+            const incr = @"for".incr != null;
+            if (init and cond and incr) {
+                repr.tag = .for_full;
+                repr.data[0] = packOptIndex(@"for".init);
+                repr.data[1] = @intCast(tree.extra.items.len);
+                try tree.extra.ensureUnusedCapacity(tree.comp.gpa, 2);
+                tree.extra.appendAssumeCapacity(packOptIndex(@"for".cond));
+                tree.extra.appendAssumeCapacity(packOptIndex(@"for".incr));
+            } else if (init and cond) {
+                repr.tag = .for_init_cond;
+                repr.data[0] = packOptIndex(@"for".init);
+                repr.data[1] = packOptIndex(@"for".cond);
+            } else if (init and incr) {
+                repr.tag = .for_init_incr;
+                repr.data[0] = packOptIndex(@"for".init);
+                repr.data[1] = packOptIndex(@"for".incr);
+            } else if (cond and incr) {
+                repr.tag = .for_cond_incr;
+                repr.data[0] = packOptIndex(@"for".cond);
+                repr.data[1] = packOptIndex(@"for".incr);
+            } else if (init) {
+                repr.tag = .for_init;
+                repr.data[0] = packOptIndex(@"for".cond);
+            } else if (cond) {
+                repr.tag = .for_cond;
+                repr.data[0] = packOptIndex(@"for".cond);
+            } else if (incr) {
+                repr.tag = .for_incr;
+                repr.data[0] = packOptIndex(@"for".cond);
+            } else {
+                repr.tag = .for_ever;
             }
             repr.data[2] = @intFromEnum(@"for".body);
             repr.tok = @"for".for_tok;
@@ -2384,6 +2547,17 @@ pub fn setNode(tree: *Tree, node: Node, index: usize) !void {
                 tree.extra.appendSliceAssumeCapacity(@ptrCast(asm_stmt.inputs));
                 tree.extra.appendSliceAssumeCapacity(@ptrCast(asm_stmt.clobbers));
                 tree.extra.appendSliceAssumeCapacity(@ptrCast(asm_stmt.labels));
+            }
+        },
+        .decl_stmt => |decl_stmt| {
+            repr.tok = decl_stmt.first_tok;
+            if (decl_stmt.decls.len > 3) {
+                repr.tag = .decl_stmt;
+                repr.data[0], repr.data[1] = try tree.addExtra(decl_stmt.decls);
+            } else {
+                repr.tag = .decl_stmt_three;
+                for (&repr.data, 0..) |*data, idx|
+                    data.* = packElem(decl_stmt.decls, idx);
             }
         },
         .assign_expr => |bin| {
@@ -3152,6 +3326,196 @@ pub fn tokSlice(tree: *const Tree, tok_i: TokenIndex) []const u8 {
     return tree.comp.locSlice(loc);
 }
 
+pub fn write(tree: *const Tree, node: Node.Index, w: *std.Io.Writer) std.Io.Writer.Error!void {
+    switch (node.get(tree)) {
+        .cast => |cast| {
+            if (!cast.implicit) {
+                try w.writeByte('(');
+                try cast.qt.printDesugared(tree.comp, w);
+                try w.writeByte(')');
+            }
+            try tree.write(cast.operand, w);
+        },
+        .paren_expr => |un| {
+            try w.writeByte('(');
+            try tree.write(un.operand, w);
+            try w.writeByte(')');
+        },
+        .comma_expr => |bin| {
+            try tree.write(bin.lhs, w);
+            try w.writeAll(", ");
+            try tree.write(bin.rhs, w);
+        },
+        .bool_or_expr,
+        .bool_and_expr,
+        .bit_or_expr,
+        .bit_xor_expr,
+        .bit_and_expr,
+        .equal_expr,
+        .not_equal_expr,
+        .less_than_expr,
+        .less_than_equal_expr,
+        .greater_than_expr,
+        .greater_than_equal_expr,
+        .shl_expr,
+        .shr_expr,
+        .add_expr,
+        .sub_expr,
+        .mul_expr,
+        .div_expr,
+        .mod_expr,
+        => |bin| {
+            try tree.write(bin.lhs, w);
+            try w.print(" {s} ", .{tree.tokSlice(bin.op_tok)});
+            try tree.write(bin.rhs, w);
+        },
+        .addr_of_expr,
+        .deref_expr,
+        .plus_expr,
+        .negate_expr,
+        .bit_not_expr,
+        .bool_not_expr,
+        .pre_inc_expr,
+        .pre_dec_expr,
+        => |un| {
+            try w.writeAll(tree.tokSlice(un.op_tok));
+            try tree.write(un.operand, w);
+        },
+        .imag_expr,
+        .real_expr,
+        => |un| {
+            try w.writeAll(tree.tokSlice(un.op_tok));
+            try w.writeByte(' ');
+            try tree.write(un.operand, w);
+        },
+        .post_inc_expr,
+        .post_dec_expr,
+        => |un| {
+            try tree.write(un.operand, w);
+            try w.writeAll(tree.tokSlice(un.op_tok));
+        },
+        .bool_literal,
+        .nullptr_literal,
+        .int_literal,
+        .float_literal,
+        => |literal| {
+            try w.writeAll(tree.tokSlice(literal.literal_tok));
+        },
+        .char_literal => |literal| {
+            try w.writeAll(tree.tokSlice(literal.literal_tok));
+        },
+        .string_literal_expr => |literal| {
+            const val = tree.value_map.get(node).?;
+            _ = try val.print(literal.qt, tree.comp, w);
+        },
+        .imaginary_literal => |un| try tree.write(un.operand, w),
+        .sizeof_expr,
+        .alignof_expr,
+        => |type_info| {
+            try w.writeAll(tree.tokSlice(type_info.op_tok));
+            if (type_info.expr) |expr| {
+                try w.writeByte(' ');
+                return tree.write(expr, w);
+            }
+            try w.writeByte('(');
+            try type_info.operand_qt.printDesugared(tree.comp, w);
+            try w.writeByte(')');
+        },
+        .decl_ref_expr,
+        .enumeration_ref,
+        => |decl_ref| {
+            try w.writeAll(tree.tokSlice(decl_ref.name_tok));
+        },
+        .builtin_types_compatible_p => |bin| {
+            try w.writeAll(tree.tokSlice(bin.builtin_tok));
+            try w.writeByte('(');
+            try bin.lhs.printDesugared(tree.comp, w);
+            try w.writeAll(", ");
+            try bin.rhs.printDesugared(tree.comp, w);
+            try w.writeByte(')');
+        },
+        .generic_expr => |generic| {
+            try w.writeAll(tree.tokSlice(generic.generic_tok));
+            try w.writeByte('(');
+            try tree.write(generic.controlling, w);
+            for (generic.rest) |association| {
+                try w.writeAll(", ");
+                try tree.write(association, w);
+            }
+            try w.writeAll(", ");
+            try tree.write(generic.chosen, w);
+            try w.writeByte(')');
+        },
+        .generic_association_expr => |generic| {
+            try generic.association_qt.printDesugared(tree.comp, w);
+            try w.writeAll(": ");
+            try tree.write(generic.expr, w);
+        },
+        .generic_default_expr => |generic| {
+            try w.writeAll(tree.tokSlice(generic.default_tok));
+            try w.writeAll(": ");
+            try tree.write(generic.expr, w);
+        },
+        .builtin_call_expr => |call| {
+            try w.writeAll(tree.tokSlice(call.builtin_tok));
+            try w.writeByte('(');
+            for (call.args, 0..) |arg, i| {
+                if (i != 0) try w.writeAll(", ");
+                try tree.write(arg, w);
+            }
+            try w.writeByte(')');
+        },
+        .binary_cond_expr => |cond| {
+            try tree.write(cond.cond, w);
+            try w.writeAll(" ?: ");
+            try tree.write(cond.else_expr, w);
+        },
+        .cond_expr => |cond| {
+            try tree.write(cond.cond, w);
+            try w.writeAll(" ? ");
+            try tree.write(cond.then_expr, w);
+            try w.writeAll(" : ");
+            try tree.write(cond.else_expr, w);
+        },
+        .builtin_choose_expr => |cond| {
+            try w.writeAll("__builtin_choose_expr(");
+            try tree.write(cond.cond, w);
+            try w.writeAll(", ");
+            try tree.write(cond.then_expr, w);
+            try w.writeAll(", ");
+            try tree.write(cond.else_expr, w);
+            try w.writeByte(')');
+        },
+        .builtin_va_arg_pack,
+        .builtin_va_arg_pack_len,
+        => |va_arg| {
+            try w.writeAll(tree.tokSlice(va_arg.builtin_tok));
+            try w.writeAll("()");
+        },
+        .array_access_expr => |access| {
+            try tree.write(access.base, w);
+            try w.writeByte('[');
+            try tree.write(access.index, w);
+            try w.writeByte(']');
+        },
+        .member_access_expr,
+        .member_access_ptr_expr,
+        => |access| {
+            try tree.write(access.base, w);
+
+            var base_qt = access.base.qt(tree);
+            if (base_qt.get(tree.comp, .pointer)) |some| base_qt = some.child;
+            const fields = (base_qt.getRecord(tree.comp) orelse return).fields;
+            const name = fields[access.member_index].name.lookup(tree.comp);
+            if (name[0] == '(') return;
+
+            try w.writeAll(tree.tokSlice(access.access_tok));
+            try w.writeAll(name);
+        },
+        else => try w.writeAll("<node>"),
+    }
+}
+
 pub fn dump(tree: *const Tree, term: std.Io.Terminal) std.Io.Terminal.SetColorError!void {
     for (tree.root_decls.items) |i| {
         try tree.dumpNode(i, 0, term);
@@ -3604,20 +3968,10 @@ fn dumpNode(
             try tree.dumpNode(do.body, level + delta, term);
         },
         .for_stmt => |@"for"| {
-            switch (@"for".init) {
-                .decls => |decls| {
-                    try w.splatByteAll(' ', level + half);
-                    try w.writeAll("decl:\n");
-                    for (decls) |decl| {
-                        try tree.dumpNode(decl, level + delta, term);
-                        try w.writeByte('\n');
-                    }
-                },
-                .expr => |expr| if (expr) |some| {
-                    try w.splatByteAll(' ', level + half);
-                    try w.writeAll("init:\n");
-                    try tree.dumpNode(some, level + delta, term);
-                },
+            if (@"for".init) |some| {
+                try w.splatByteAll(' ', level + half);
+                try w.writeAll("init:\n");
+                try tree.dumpNode(some, level + delta, term);
             }
             if (@"for".cond) |some| {
                 try w.splatByteAll(' ', level + half);
@@ -3729,6 +4083,11 @@ fn dumpNode(
                 for (@"asm".labels) |label| {
                     try tree.dumpNode(label, level + delta, term);
                 }
+            }
+        },
+        .decl_stmt => |decl_stmt| {
+            for (decl_stmt.decls) |decl| {
+                try tree.dumpNode(decl, level + delta, term);
             }
         },
         .call_expr => |call| {

@@ -2,11 +2,11 @@
 // (extensions are a superset of features).
 
 #if !__has_feature(attribute_deprecated_with_message)
-#error expected attribute_deprecated_with_message to be availble as a feature
+#error expected attribute_deprecated_with_message to be available as a feature
 #endif
 
 #if !__has_extension(attribute_deprecated_with_message)
-#error expected attribute_deprecated_with_message to be availble as an extension
+#error expected attribute_deprecated_with_message to be available as an extension
 #endif
 
 /** manifest:

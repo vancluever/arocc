@@ -68,7 +68,7 @@ pub fn build(b: *Build) !void {
     const target = b.standardTargetOptions(.{});
 
     // Standard release options allow the person running `zig build` to select
-    // between Debug, ReleaseSafe, ReleaseFast, and ReleaseSmall.
+    // between debug, safe, fast, and small.
     const mode = b.standardOptimizeOption(.{});
 
     const afl_clang_lto_path = b.option([]const u8, "afl-clang-lto-path", "Path to afl-clang-lto") orelse "afl-clang-lto";
@@ -155,16 +155,9 @@ pub fn build(b: *Build) !void {
     aro_options.addOption([]const u8, "version_str", version_str);
     const aro_options_module = aro_options.createModule();
 
-    const zig_module = b.createModule(.{
-        .root_source_file = b.path("deps/zig/lib.zig"),
-    });
     const aro_backend = b.addModule("aro_backend", .{
         .root_source_file = b.path("src/backend.zig"),
         .imports = &.{
-            .{
-                .name = "zig",
-                .module = zig_module,
-            },
             .{
                 .name = "build_options",
                 .module = aro_options_module,
