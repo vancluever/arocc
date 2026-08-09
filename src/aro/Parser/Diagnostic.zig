@@ -43,11 +43,6 @@ pub const to_match_bracket: Diagnostic = .{
     .kind = .note,
 };
 
-pub const float_literal_in_pp_expr: Diagnostic = .{
-    .fmt = "floating point literal in preprocessor expression",
-    .kind = .@"error",
-};
-
 pub const expected_invalid: Diagnostic = .{
     .fmt = "expected '{tok_id}', found invalid bytes",
     .kind = .@"error",
@@ -437,6 +432,11 @@ pub const array_incomplete_elem: Diagnostic = .{
     .kind = .@"error",
 };
 
+pub const array_elem_size_not_multiple: Diagnostic = .{
+    .fmt = "size of array element of type {qt} ({d} bytes) isn't a multiple of its alignment ({d} bytes)",
+    .kind = .@"error",
+};
+
 pub const array_func_elem: Diagnostic = .{
     .fmt = "arrays cannot have functions as their element type",
     .kind = .@"error",
@@ -568,8 +568,8 @@ pub const expected_parens_around_typename: Diagnostic = .{
     .kind = .@"error",
 };
 
-pub const alignof_expr: Diagnostic = .{
-    .fmt = "'_Alignof' applied to an expression is a GNU extension",
+pub const gnu_alignof_expr: Diagnostic = .{
+    .fmt = "'{s}' applied to an expression is a GNU extension",
     .opt = .@"gnu-alignof-expression",
     .kind = .warning,
     .extension = true,
@@ -1048,11 +1048,6 @@ pub const division_by_zero: Diagnostic = .{
     .opt = .@"division-by-zero",
 };
 
-pub const division_by_zero_macro: Diagnostic = .{
-    .fmt = "{s} by zero in preprocessor expression",
-    .kind = .@"error",
-};
-
 pub const builtin_choose_cond: Diagnostic = .{
     .fmt = "'__builtin_choose_expr' requires a constant expression",
     .kind = .@"error",
@@ -1283,11 +1278,6 @@ pub const implicitly_unsigned_literal: Diagnostic = .{
     .opt = .@"implicitly-unsigned-literal",
     .kind = .warning,
     .extension = true,
-};
-
-pub const invalid_preproc_operator: Diagnostic = .{
-    .fmt = "token is not a valid binary operator in a preprocessor subexpression",
-    .kind = .@"error",
 };
 
 pub const c99_compat: Diagnostic = .{
@@ -1833,6 +1823,12 @@ pub const unused_label: Diagnostic = .{
     .opt = .@"unused-label",
 };
 
+pub const unused_comparison: Diagnostic = .{
+    .fmt = "{s} comparison result unused",
+    .kind = .warning,
+    .opt = .@"unused-comparison",
+};
+
 pub const invalid_imag: Diagnostic = .{
     .fmt = "invalid type {qt} to __imag operator",
     .kind = .@"error",
@@ -1861,36 +1857,6 @@ pub const main_return_type: Diagnostic = .{
     .kind = .warning,
     .opt = .@"main-return-type",
     .extension = true,
-};
-
-pub const invalid_int_suffix: Diagnostic = .{
-    .fmt = "invalid suffix '{s}' on integer constant",
-    .kind = .@"error",
-};
-
-pub const invalid_float_suffix: Diagnostic = .{
-    .fmt = "invalid suffix '{s}' on floating constant",
-    .kind = .@"error",
-};
-
-pub const invalid_octal_digit: Diagnostic = .{
-    .fmt = "invalid digit '{c}' in octal constant",
-    .kind = .@"error",
-};
-
-pub const invalid_binary_digit: Diagnostic = .{
-    .fmt = "invalid digit '{c}' in binary constant",
-    .kind = .@"error",
-};
-
-pub const exponent_has_no_digits: Diagnostic = .{
-    .fmt = "exponent has no digits",
-    .kind = .@"error",
-};
-
-pub const hex_floating_constant_requires_exponent: Diagnostic = .{
-    .fmt = "hexadecimal floating constant requires an exponent",
-    .kind = .@"error",
 };
 
 pub const sizeof_returns_zero: Diagnostic = .{
@@ -1989,14 +1955,6 @@ pub const invalid_object_cast: Diagnostic = .{
 pub const suggest_pointer_for_invalid_fp16: Diagnostic = .{
     .fmt = "{s} cannot have __fp16 type; did you forget * ?",
     .kind = .@"error",
-};
-
-pub const bitint_suffix: Diagnostic = .{
-    .fmt = "'_BitInt' suffix for literals is a C23 extension",
-    .opt = .@"c23-extensions",
-    .kind = .warning,
-    .suppress_version = .c23,
-    .extension = true,
 };
 
 pub const auto_type_extension: Diagnostic = .{
@@ -2188,14 +2146,6 @@ pub const gnu_label_attr: Diagnostic = .{
     .fmt = "GNU-style attribute between label and declaration applies to the label",
     .opt = .@"label-attribute",
     .kind = .warning,
-    .extension = true,
-};
-
-pub const u8_char_lit: Diagnostic = .{
-    .fmt = "UTF-8 character literal is a C23 extension",
-    .opt = .@"c23-extensions",
-    .kind = .warning,
-    .suppress_version = .c23,
     .extension = true,
 };
 

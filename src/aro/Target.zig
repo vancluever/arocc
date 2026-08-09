@@ -108,14 +108,14 @@ pub const SubArch = enum {
 
     pub fn toFeature(sub: SubArch, arch: Cpu.Arch) ?std.Target.Cpu.Feature.Set.Index {
         if (arch.isPowerPC()) {
-            if (sub == .powerpc_spe) return @intFromEnum(std.Target.powerpc.Feature.spe);
+            if (sub == .powerpc_spe) return @backingInt(std.Target.powerpc.Feature.spe);
         } else if (arch.isMIPS32()) {
-            return @intFromEnum(std.Target.mips.Feature.mips32r6);
+            return @backingInt(std.Target.mips.Feature.mips32r6);
         } else if (arch.isMIPS64()) {
-            return @intFromEnum(std.Target.mips.Feature.mips64r6);
+            return @backingInt(std.Target.mips.Feature.mips64r6);
         } else if (arch.isSpirV()) {
             const spirv = std.Target.spirv.Feature;
-            return @intFromEnum(switch (sub) {
+            return @backingInt(switch (sub) {
                 .spirv_v10 => spirv.v1_0,
                 .spirv_v11 => spirv.v1_1,
                 .spirv_v12 => spirv.v1_2,
@@ -127,7 +127,7 @@ pub const SubArch = enum {
             });
         } else if (arch.isAARCH64()) {
             const aarch64 = std.Target.aarch64.Feature;
-            return @intFromEnum(switch (sub) {
+            return @backingInt(switch (sub) {
                 .arm_v8_1a => aarch64.v8_1a,
                 .arm_v8_2a => aarch64.v8_2a,
                 .arm_v8_3a => aarch64.v8_3a,
@@ -154,7 +154,7 @@ pub const SubArch = enum {
             });
         } else if (arch.isArm()) {
             const arm = std.Target.arm.Feature;
-            return @intFromEnum(switch (sub) {
+            return @backingInt(switch (sub) {
                 .arm_v4t => arm.v4t,
                 .arm_v5 => arm.v5t,
                 .arm_v5te => arm.v5te,
@@ -242,7 +242,12 @@ pub fn intMaxType(target: *const Target) QualType {
         .aarch64,
         .aarch64_be,
         .sparc64,
-        => if (target.os.tag != .openbsd) return .long,
+        => {
+            if (target.os.tag == .openbsd) return .long_long;
+            if (target.os.tag == .windows) return .long_long;
+            if (target.os.tag.isDarwin() and target.abi == .ilp32) return .long_long;
+            return .long;
+        },
 
         .bpfel,
         .bpfeb,
@@ -256,10 +261,19 @@ pub fn intMaxType(target: *const Target) QualType {
         .x86_64 => switch (target.os.tag) {
             .windows, .openbsd, .uefi => {},
             else => switch (target.abi) {
-                .gnux32, .muslx32 => {},
+                .gnux32,
+                .muslx32,
+                .x32,
+                .gnuabin32,
+                .muslabin32,
+                .abin32,
+                .ilp32,
+                => {},
                 else => return .long,
             },
         },
+
+        .mips, .mipsel, .sparc => {}, // TODO
 
         else => {},
     }
@@ -1629,15 +1643,15 @@ pub fn ptrBitWidth(target: *const Target) u16 {
 }
 
 pub fn cCharSignedness(target: *const Target) std.builtin.Signedness {
-    return target.toZigTarget().cCharSignedness();
+    return target.toZigTarget().cCharSignedness().?;
 }
 
 pub fn cTypeBitSize(target: *const Target, c_type: std.Target.CType) u16 {
-    return target.toZigTarget().cTypeBitSize(c_type);
+    return target.toZigTarget().cTypeBitSize(c_type).?;
 }
 
 pub fn cTypeAlignment(target: *const Target, c_type: std.Target.CType) u16 {
-    return target.toZigTarget().cTypeAlignment(c_type);
+    return target.toZigTarget().cTypeAlignment(c_type).?;
 }
 
 pub fn standardDynamicLinkerPath(target: *const Target) std.Target.DynamicLinker {
@@ -1864,7 +1878,7 @@ pub fn armVersion(target: Target) ?struct { version: u8, string: []const u8 } {
         .{ .v2a, "2A" },
         .{ .v2, "2" },
     }) |fs| {
-        if (target.cpu.features.isEnabled(@intFromEnum(fs[0]))) {
+        if (target.cpu.features.isEnabled(@backingInt(fs[0]))) {
             return .{
                 .version = fs[1][0] - '0',
                 .string = fs[1],
@@ -1915,4 +1929,59 @@ test parseOs {
     try parseOs(&query, "darwin26", null);
     try testing.expect(query.os_tag == .macos);
     try testing.expectEqual(query.os_version_min, V{ .semver = .{ .major = 26, .minor = 0, .patch = 0 } });
+}
+
+pub const MipsAbi = enum { o32, n32, n64 };
+
+pub fn mipsAbi(target: *const Target) MipsAbi {
+    return switch (target.abi) {
+        .gnuabin32, .muslabin32, .abin32 => .n32,
+        else => switch (target.cpu.arch) {
+            .mips, .mipsel => .o32,
+            .mips64, .mips64el => .n64,
+            else => unreachable,
+        },
+    };
+}
+
+pub const MipsFpMode = enum { fp32, fp64, fpxx };
+
+/// Returns the CPU name for a MIPS target, if known. For some sub-architectures,
+/// the CPU name is inferred if it is not available from the target's model.
+pub fn mipsCpuName(target: *const Target) ?[]const u8 {
+    // Clang overwrites the CPU name for BSD. See `mips::getMipsCPUAndABI`.
+    switch (target.os.tag) {
+        .freebsd => return if (target.cpu.arch.isMIPS32()) "mips2" else "mips3",
+        .openbsd => if (target.cpu.arch.isMIPS64()) return "mips3",
+        else => {},
+    }
+    if (target.cpu.model.llvm_name) |name| return name;
+    if (target.cpu.arch.isMIPS64() and target.cpu.has(.mips, .mips64r6)) return "mips64r6";
+    if (target.cpu.arch.isMIPS32() and target.cpu.has(.mips, .mips32r6)) return "mips32r6";
+    return null;
+}
+
+/// Returns the default MIPS floating-point mode for the target.
+pub fn defaultMipsFpMode(target: *const Target) MipsFpMode {
+    const cpu = mipsCpuName(target) orelse "";
+    if (std.mem.eql(u8, cpu, "mips32r6") or
+        target.mipsAbi() == .n32 or target.mipsAbi() == .n64) return .fp64;
+    if (std.mem.eql(u8, cpu, "mips1")) return .fp32;
+    return .fpxx;
+}
+
+const mips_isa_revs = std.StaticStringMap(u8).initComptime(.{
+    .{ "mips32", 1 },   .{ "mips64", 1 },
+    .{ "mips32r2", 2 }, .{ "mips64r2", 2 },
+    .{ "octeon", 2 },   .{ "octeon+", 2 },
+    .{ "mips32r3", 3 }, .{ "mips64r3", 3 },
+    .{ "mips32r5", 5 }, .{ "mips64r5", 5 },
+    .{ "p5600", 5 },    .{ "mips32r6", 6 },
+    .{ "mips64r6", 6 }, .{ "i6400", 6 },
+    .{ "i6500", 6 },
+});
+
+pub fn mipsIsaRev(target: *const Target) u8 {
+    const cpu = mipsCpuName(target) orelse return 0;
+    return mips_isa_revs.get(cpu) orelse 0;
 }
