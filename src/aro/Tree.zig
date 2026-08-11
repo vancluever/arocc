@@ -382,6 +382,11 @@ pub const Node = union(enum) {
         assert_tok: TokenIndex,
         cond: Node.Index,
         message: ?Node.Index,
+
+        pub fn firstCondToken(node: StaticAssert) TokenIndex {
+            // conditional starts after paren
+            return node.assert_tok + 2;
+        }
     };
 
     pub const Function = struct {
